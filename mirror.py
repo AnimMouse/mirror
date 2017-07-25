@@ -174,8 +174,8 @@ class HomeHandler(BaseHandler):
     if form_url:
       # Accept URLs that still have a leading 'http://'
       inputted_url = urllib.unquote(form_url)
-      if inputted_url.startswith(HTTP_PREFIX):
-        inputted_url = inputted_url[len(HTTP_PREFIX):]
+      if inputted_url.startswith('http'):
+        inputted_url = inputted_url.lstrip('http://').lstrip('https://')
       return self.redirect("/" + inputted_url)
 
     # Do this dictionary construction here, to decouple presentation from
