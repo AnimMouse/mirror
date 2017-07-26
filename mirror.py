@@ -171,10 +171,12 @@ class HomeHandler(BaseHandler):
     # Handle the input form to redirect the user to a relative url
     form_url = self.request.get("url")
     if form_url:
-      # Accept URLs that still have a leading 'http://'
+      # Accept URLs that still have a leading 'http(s)://'
       inputted_url = urllib.unquote(form_url)
       if inputted_url.startswith('http'):
-        inputted_url = inputted_url.lstrip('http://').lstrip('https://')
+        inputted_url = inputted_url.replace('://', '_', 1)
+      else:
+        inputted_url = 'http_'+inputted_url
       return self.redirect("/" + inputted_url)
 
     # Do this dictionary construction here, to decouple presentation from
@@ -202,7 +204,11 @@ class MirrorHandler(BaseHandler):
     logging.debug('Base_url = "%s", url = "%s"', base_url, self.request.url)
 
     translated_address = self.get_relative_url()[1:]  # remove leading /
-    mirrored_url = HTTP_PREFIX + translated_address
+    try:
+      scheme, url = translated_address.split('_', 1)
+      mirrored_url = '%s://%s' % (scheme, url)
+    except ValueError:
+      mirrored_url = 'http://%s' % translated_address
 
     # Use sha256 hash instead of mirrored url for the key name, since key
     # names can only be 500 bytes in length; URLs may be up to 2KB.

@@ -22,7 +22,7 @@ import urlparse
 ################################################################################
 
 # URLs that have absolute addresses
-ABSOLUTE_URL_REGEX = r"(http(s?):)?//(?P<url>[^\"'> \t\)]+)"
+ABSOLUTE_URL_REGEX = r"((?P<scheme>http(s?)):)?//(?P<url>[^\"'> \t\)]+)"
 
 # URLs that are relative to the base of the current hostname.
 BASE_RELATIVE_URL_REGEX = r"/(?!(/)|(http(s?)://)|(url\())(?P<url>[^\"'> \t\)]*)"
@@ -45,6 +45,12 @@ CSS_IMPORT_START = r"(?i)@import(?P<spacing>[\t ]+)(?P<quote>[\"']?)"
 # CSS url() call
 CSS_URL_START = r"(?i)\burl\((?P<quote>[\"']?)"
 
+def replscheme(m):
+  if m.group('scheme') is not None:
+    s = '%s%s%s/%s_%s' % (m.group('tag'), m.group('equals'), m.group('quote'), m.group('scheme'), m.group('url'))
+  else:
+    s = '%s%s%s/%s' % (m.group('tag'), m.group('equals'), m.group('quote'), m.group('url'))
+  return s
 
 REPLACEMENT_OTHER_REGEXES = [
   (TAG_START + TRAVERSAL_URL_REGEX,
@@ -59,7 +65,8 @@ REPLACEMENT_OTHER_REGEXES = [
   # Need this because HTML tags could end with '/>', which confuses the
   # tag-matching regex above, since that's the end-of-match signal.
   (TAG_START + ABSOLUTE_URL_REGEX,
-     "\g<tag>\g<equals>\g<quote>/\g<url>"),
+     replscheme),
+     #"\g<tag>\g<equals>\g<quote>/\g<scheme>_\g<url>"),
 
   (CSS_IMPORT_START + TRAVERSAL_URL_REGEX,
      "@import\g<spacing>\g<quote>%(accessed_dir)s/\g<relative>/\g<url>"),
@@ -68,7 +75,7 @@ REPLACEMENT_OTHER_REGEXES = [
      "@import\g<spacing>\g<quote>/%(base)s/\g<url>"),
 
   (CSS_IMPORT_START + ABSOLUTE_URL_REGEX,
-     "@import\g<spacing>\g<quote>/\g<url>"),
+     "@import\g<spacing>\g<quote>/\g<scheme>_\g<url>"),
 
   (CSS_URL_START + TRAVERSAL_URL_REGEX,
       "url(\g<quote>%(accessed_dir)s/\g<relative>/\g<url>"),
@@ -77,7 +84,7 @@ REPLACEMENT_OTHER_REGEXES = [
       "url(\g<quote>/%(base)s/\g<url>"),
 
   (CSS_URL_START + ABSOLUTE_URL_REGEX,
-      "url(\g<quote>/\g<url>"),
+      "url(\g<quote>/\g<scheme>_\g<url>"),
 ]
 
 REPLACEMENT_SAME_DIR_URL_REGEXES = [
@@ -105,9 +112,12 @@ def transform_content(base_url, accessed_url, content):
       regexes = REPLACEMENT_SAME_DIR_URL_REGEXES + regexes # insert at the beginning
 
   for pattern, replacement in regexes:
-    fixed_replacement = replacement % {
-      "base": base_url,
-      "accessed_dir": accessed_dir,
-    }
+    if not callable(replacement):
+      fixed_replacement = replacement % {
+        "base": base_url,
+        "accessed_dir": accessed_dir,
+      }
+    else:
+      fixed_replacement = replacement
     content = re.sub(pattern, fixed_replacement, content)
   return content
