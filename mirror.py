@@ -143,10 +143,6 @@ class MirroredContent(object):
 
 ###############################################################################
 
-class WarmupHandler(webapp2.RequestHandler):
-  def get(self):
-    pass
-
 
 class BaseHandler(webapp2.RequestHandler):
   def get_relative_url(self):
@@ -238,7 +234,5 @@ class MirrorHandler(BaseHandler):
 
 app = webapp2.WSGIApplication([
   (r"/", HomeHandler),
-  (r"/main", HomeHandler),
-  (r"/_ah/warmup", WarmupHandler),
   (r"/([^/]+).*", MirrorHandler),
 ], debug=DEBUG)
