@@ -37,7 +37,7 @@ SAME_DIR_URL_REGEX = r"(?!(/)|(http(s?)://)|(url\())(?P<url>[^\"'> \t\)]+)"
 ROOT_DIR_URL_REGEX = r"(?!//(?!>))/(?P<url>)(?=[ \t\n]*[\"'\)>/])"
 
 # Start of a tag using 'src' or 'href'
-TAG_START = r"(?i)\b(?P<tag>src|href|action|url|background)(?P<equals>[\t ]*=[\t ]*)(?P<quote>[\"']?)"
+TAG_START = r"(?i)\b(?P<tag>src|href|action|url|background|srcset)(?P<equals>[\t ]*=[\t ]*)(?P<quote>[\"']?)"
 
 # Start of a CSS import
 CSS_IMPORT_START = r"(?i)@import(?P<spacing>[\t ]+)(?P<quote>[\"']?)"
