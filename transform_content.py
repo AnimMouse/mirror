@@ -46,10 +46,7 @@ CSS_IMPORT_START = r"(?i)@import(?P<spacing>[\t ]+)(?P<quote>[\"']?)"
 CSS_URL_START = r"(?i)\burl\((?P<quote>[\"']?)"
 
 
-REPLACEMENT_REGEXES = [
-  (TAG_START + SAME_DIR_URL_REGEX,
-     "\g<tag>\g<equals>\g<quote>%(accessed_dir)s\g<url>"),
-
+REPLACEMENT_OTHER_REGEXES = [
   (TAG_START + TRAVERSAL_URL_REGEX,
      "\g<tag>\g<equals>\g<quote>%(accessed_dir)s/\g<relative>/\g<url>"),
 
@@ -64,9 +61,6 @@ REPLACEMENT_REGEXES = [
   (TAG_START + ABSOLUTE_URL_REGEX,
      "\g<tag>\g<equals>\g<quote>/\g<url>"),
 
-  (CSS_IMPORT_START + SAME_DIR_URL_REGEX,
-     "@import\g<spacing>\g<quote>%(accessed_dir)s\g<url>"),
-
   (CSS_IMPORT_START + TRAVERSAL_URL_REGEX,
      "@import\g<spacing>\g<quote>%(accessed_dir)s/\g<relative>/\g<url>"),
 
@@ -75,9 +69,6 @@ REPLACEMENT_REGEXES = [
 
   (CSS_IMPORT_START + ABSOLUTE_URL_REGEX,
      "@import\g<spacing>\g<quote>/\g<url>"),
-
-  (CSS_URL_START + SAME_DIR_URL_REGEX,
-     "url(\g<quote>%(accessed_dir)s\g<url>"),
 
   (CSS_URL_START + TRAVERSAL_URL_REGEX,
       "url(\g<quote>%(accessed_dir)s/\g<relative>/\g<url>"),
@@ -89,15 +80,31 @@ REPLACEMENT_REGEXES = [
       "url(\g<quote>/\g<url>"),
 ]
 
+REPLACEMENT_SAME_DIR_URL_REGEXES = [
+  (TAG_START + SAME_DIR_URL_REGEX,
+     "\g<tag>\g<equals>\g<quote>%(accessed_dir)s\g<url>"),
+
+  (CSS_IMPORT_START + SAME_DIR_URL_REGEX,
+     "@import\g<spacing>\g<quote>%(accessed_dir)s\g<url>"),
+
+  (CSS_URL_START + SAME_DIR_URL_REGEX,
+     "url(\g<quote>%(accessed_dir)s\g<url>"),
+]
+
 ################################################################################
 
-def TransformContent(base_url, accessed_url, content):
+def transform_content(base_url, accessed_url, content):
   url_obj = urlparse.urlparse(accessed_url)
   accessed_dir = os.path.dirname(url_obj.path)
   if not accessed_dir.endswith("/"):
     accessed_dir += "/"
 
-  for pattern, replacement in REPLACEMENT_REGEXES:
+  # only transform relative url if there is no base tag
+  regexes = list(REPLACEMENT_OTHER_REGEXES) # we must make a copy otherwise, it will modify the original list
+  if re.search(r'(?i)<base +[^>]*href', content) is None:
+      regexes = REPLACEMENT_SAME_DIR_URL_REGEXES + regexes # insert at the beginning
+
+  for pattern, replacement in regexes:
     fixed_replacement = replacement % {
       "base": base_url,
       "accessed_dir": accessed_dir,

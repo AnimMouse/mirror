@@ -29,7 +29,7 @@ import webapp2
 from google.appengine.ext.webapp import template
 from google.appengine.runtime import apiproxy_errors
 
-import transform_content
+from transform_content import transform_content
 
 ###############################################################################
 
@@ -120,8 +120,7 @@ class MirroredContent(object):
     for content_type in TRANSFORMED_CONTENT_TYPES:
       # startswith() because there could be a 'charset=UTF-8' in the header.
       if page_content_type.startswith(content_type):
-        content = transform_content.TransformContent(base_url, mirrored_url,
-                                                     content)
+        content = transform_content(base_url, mirrored_url, content)
         break
 
     new_content = MirroredContent(
