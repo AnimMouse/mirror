@@ -200,10 +200,10 @@ class MirrorHandler(BaseHandler):
     logging.debug('Base_url = "%s", url = "%s"', base_url, self.request.url)
 
     translated_address = self.get_relative_url()[1:]  # remove leading /
-    try:
+    if translated_address.startswith('http'):
       scheme, url = translated_address.split('_', 1)
       mirrored_url = '%s://%s' % (scheme, url)
-    except ValueError:
+    else:
       mirrored_url = 'http://%s' % translated_address
 
     # Use sha256 hash instead of mirrored url for the key name, since key
