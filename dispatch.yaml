@@ -1,0 +1,4 @@
+dispatch:
+# Redirect appspot to custom domain.
+- url: "*.appspot.com/*"
+  service: redirect
