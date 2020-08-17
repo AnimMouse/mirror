@@ -22,7 +22,7 @@ import urlparse
 ################################################################################
 
 # URLs that have absolute addresses
-ABSOLUTE_URL_REGEX = r"((?P<scheme>http(s?)):)?//(?P<url>[^\"'> \t\)]+)"
+ABSOLUTE_URL_REGEX = r"(http(s?):)?//(?P<url>[^\"'> \t\)]+)"
 
 # URLs that are relative to the base of the current hostname.
 BASE_RELATIVE_URL_REGEX = r"/(?!(/)|(http(s?)://)|(url\())(?P<url>[^\"'> \t\)]*)"
@@ -37,7 +37,7 @@ SAME_DIR_URL_REGEX = r"(?!(/)|(http(s?)://)|(url\())(?P<url>[^\"'> \t\)]+)"
 ROOT_DIR_URL_REGEX = r"(?!//(?!>))/(?P<url>)(?=[ \t\n]*[\"'\)>/])"
 
 # Start of a tag using 'src' or 'href'
-TAG_START = r"(?i)\b(?P<tag>src|href|action|url|background|srcset)(?P<equals>[\t ]*=[\t ]*)(?P<quote>[\"']?)"
+TAG_START = r"(?i)\b(?P<tag>src|href|action|url|background)(?P<equals>[\t ]*=[\t ]*)(?P<quote>[\"']?)"
 
 # Start of a CSS import
 CSS_IMPORT_START = r"(?i)@import(?P<spacing>[\t ]+)(?P<quote>[\"']?)"
@@ -45,14 +45,11 @@ CSS_IMPORT_START = r"(?i)@import(?P<spacing>[\t ]+)(?P<quote>[\"']?)"
 # CSS url() call
 CSS_URL_START = r"(?i)\burl\((?P<quote>[\"']?)"
 
-def replscheme(m):
-  if m.group('scheme') is not None:
-    s = '%s%s%s/%s_%s' % (m.group('tag'), m.group('equals'), m.group('quote'), m.group('scheme'), m.group('url'))
-  else:
-    s = '%s%s%s/%s' % (m.group('tag'), m.group('equals'), m.group('quote'), m.group('url'))
-  return s
 
-REPLACEMENT_OTHER_REGEXES = [
+REPLACEMENT_REGEXES = [
+  (TAG_START + SAME_DIR_URL_REGEX,
+     "\g<tag>\g<equals>\g<quote>%(accessed_dir)s\g<url>"),
+
   (TAG_START + TRAVERSAL_URL_REGEX,
      "\g<tag>\g<equals>\g<quote>%(accessed_dir)s/\g<relative>/\g<url>"),
 
@@ -65,8 +62,10 @@ REPLACEMENT_OTHER_REGEXES = [
   # Need this because HTML tags could end with '/>', which confuses the
   # tag-matching regex above, since that's the end-of-match signal.
   (TAG_START + ABSOLUTE_URL_REGEX,
-     replscheme),
-     #"\g<tag>\g<equals>\g<quote>/\g<scheme>_\g<url>"),
+     "\g<tag>\g<equals>\g<quote>/\g<url>"),
+
+  (CSS_IMPORT_START + SAME_DIR_URL_REGEX,
+     "@import\g<spacing>\g<quote>%(accessed_dir)s\g<url>"),
 
   (CSS_IMPORT_START + TRAVERSAL_URL_REGEX,
      "@import\g<spacing>\g<quote>%(accessed_dir)s/\g<relative>/\g<url>"),
@@ -75,7 +74,10 @@ REPLACEMENT_OTHER_REGEXES = [
      "@import\g<spacing>\g<quote>/%(base)s/\g<url>"),
 
   (CSS_IMPORT_START + ABSOLUTE_URL_REGEX,
-     "@import\g<spacing>\g<quote>/\g<scheme>_\g<url>"),
+     "@import\g<spacing>\g<quote>/\g<url>"),
+
+  (CSS_URL_START + SAME_DIR_URL_REGEX,
+     "url(\g<quote>%(accessed_dir)s\g<url>"),
 
   (CSS_URL_START + TRAVERSAL_URL_REGEX,
       "url(\g<quote>%(accessed_dir)s/\g<relative>/\g<url>"),
@@ -84,40 +86,21 @@ REPLACEMENT_OTHER_REGEXES = [
       "url(\g<quote>/%(base)s/\g<url>"),
 
   (CSS_URL_START + ABSOLUTE_URL_REGEX,
-      "url(\g<quote>/\g<scheme>_\g<url>"),
-]
-
-REPLACEMENT_SAME_DIR_URL_REGEXES = [
-  (TAG_START + SAME_DIR_URL_REGEX,
-     "\g<tag>\g<equals>\g<quote>%(accessed_dir)s\g<url>"),
-
-  (CSS_IMPORT_START + SAME_DIR_URL_REGEX,
-     "@import\g<spacing>\g<quote>%(accessed_dir)s\g<url>"),
-
-  (CSS_URL_START + SAME_DIR_URL_REGEX,
-     "url(\g<quote>%(accessed_dir)s\g<url>"),
+      "url(\g<quote>/\g<url>"),
 ]
 
 ################################################################################
 
-def transform_content(base_url, accessed_url, content):
+def TransformContent(base_url, accessed_url, content):
   url_obj = urlparse.urlparse(accessed_url)
   accessed_dir = os.path.dirname(url_obj.path)
   if not accessed_dir.endswith("/"):
     accessed_dir += "/"
 
-  # only transform relative url if there is no base tag
-  regexes = list(REPLACEMENT_OTHER_REGEXES) # we must make a copy otherwise, it will modify the original list
-  if re.search(r'(?i)<base +[^>]*href', content) is None:
-      regexes = REPLACEMENT_SAME_DIR_URL_REGEXES + regexes # insert at the beginning
-
-  for pattern, replacement in regexes:
-    if not callable(replacement):
-      fixed_replacement = replacement % {
-        "base": base_url,
-        "accessed_dir": accessed_dir,
-      }
-    else:
-      fixed_replacement = replacement
+  for pattern, replacement in REPLACEMENT_REGEXES:
+    fixed_replacement = replacement % {
+      "base": base_url,
+      "accessed_dir": accessed_dir,
+    }
     content = re.sub(pattern, fixed_replacement, content)
   return content

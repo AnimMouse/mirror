@@ -29,7 +29,7 @@ import webapp2
 from google.appengine.ext.webapp import template
 from google.appengine.runtime import apiproxy_errors
 
-from transform_content import transform_content
+import transform_content
 
 ###############################################################################
 
@@ -120,7 +120,8 @@ class MirroredContent(object):
     for content_type in TRANSFORMED_CONTENT_TYPES:
       # startswith() because there could be a 'charset=UTF-8' in the header.
       if page_content_type.startswith(content_type):
-        content = transform_content(base_url, mirrored_url, content)
+        content = transform_content.TransformContent(base_url, mirrored_url,
+                                                     content)
         break
 
     new_content = MirroredContent(
@@ -142,6 +143,10 @@ class MirroredContent(object):
     return new_content
 
 ###############################################################################
+
+class WarmupHandler(webapp2.RequestHandler):
+  def get(self):
+    pass
 
 
 class BaseHandler(webapp2.RequestHandler):
@@ -167,12 +172,10 @@ class HomeHandler(BaseHandler):
     # Handle the input form to redirect the user to a relative url
     form_url = self.request.get("url")
     if form_url:
-      # Accept URLs that still have a leading 'http(s)://'
+      # Accept URLs that still have a leading 'http://'
       inputted_url = urllib.unquote(form_url)
-      if inputted_url.startswith('http'):
-        inputted_url = inputted_url.replace('://', '_', 1)
-      else:
-        inputted_url = 'http_'+inputted_url
+      if inputted_url.startswith(HTTP_PREFIX):
+        inputted_url = inputted_url[len(HTTP_PREFIX):]
       return self.redirect("/" + inputted_url)
 
     # Do this dictionary construction here, to decouple presentation from
@@ -200,11 +203,7 @@ class MirrorHandler(BaseHandler):
     logging.debug('Base_url = "%s", url = "%s"', base_url, self.request.url)
 
     translated_address = self.get_relative_url()[1:]  # remove leading /
-    if translated_address.startswith('http'):
-      scheme, url = translated_address.split('_', 1)
-      mirrored_url = '%s://%s' % (scheme, url)
-    else:
-      mirrored_url = 'http://%s' % translated_address
+    mirrored_url = HTTP_PREFIX + translated_address
 
     # Use sha256 hash instead of mirrored url for the key name, since key
     # names can only be 500 bytes in length; URLs may be up to 2KB.
@@ -234,5 +233,7 @@ class MirrorHandler(BaseHandler):
 
 app = webapp2.WSGIApplication([
   (r"/", HomeHandler),
+  (r"/main", HomeHandler),
+  (r"/_ah/warmup", WarmupHandler),
   (r"/([^/]+).*", MirrorHandler),
 ], debug=DEBUG)
